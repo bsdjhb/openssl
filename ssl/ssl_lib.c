@@ -22,6 +22,7 @@
 #include <openssl/ct.h>
 #include "internal/cryptlib.h"
 #include "internal/refcount.h"
+#include "internal/ktls.h"
 
 const char SSL_version_str[] = OPENSSL_VERSION_TEXT;
 
@@ -1153,11 +1154,15 @@ void SSL_free(SSL *s)
     dane_final(&s->dane);
     CRYPTO_free_ex_data(CRYPTO_EX_INDEX_SSL, s, &s->ex_data);
 
+    RECORD_LAYER_release(&s->rlayer);
+
     /* Ignore return value */
     ssl_free_wbio_buffer(s);
 
     BIO_free_all(s->wbio);
+    s->wbio = NULL;
     BIO_free_all(s->rbio);
+    s->rbio = NULL;
 
     BUF_MEM_free(s->init_buf);
 
@@ -1213,8 +1218,6 @@ void SSL_free(SSL *s)
 
     if (s->method != NULL)
         s->method->ssl_free(s);
-
-    RECORD_LAYER_release(&s->rlayer);
 
     SSL_CTX_free(s->ctx);
 
@@ -1355,6 +1358,15 @@ int SSL_set_fd(SSL *s, int fd)
     }
     BIO_set_fd(bio, fd, BIO_NOCLOSE);
     SSL_set_bio(s, bio, bio);
+#ifndef OPENSSL_NO_KTLS
+    /*
+     * The new socket is created successfully regardless of ktls_enable.
+     * ktls_enable doesn't change any functionality of the socket, except
+     * changing the setsockopt to enable the processing of ktls_start.
+     * Thus, it is not a problem to call it for non-TLS sockets.
+     */
+    ktls_enable(fd);
+#endif /* OPENSSL_NO_KTLS */
     ret = 1;
  err:
     return ret;
@@ -1374,6 +1386,15 @@ int SSL_set_wfd(SSL *s, int fd)
         }
         BIO_set_fd(bio, fd, BIO_NOCLOSE);
         SSL_set0_wbio(s, bio);
+#ifndef OPENSSL_NO_KTLS
+        /*
+         * The new socket is created successfully regardless of ktls_enable.
+         * ktls_enable doesn't change any functionality of the socket, except
+         * changing the setsockopt to enable the processing of ktls_start.
+         * Thus, it is not a problem to call it for non-TLS sockets.
+         */
+        ktls_enable(fd);
+#endif /* OPENSSL_NO_KTLS */
     } else {
         BIO_up_ref(rbio);
         SSL_set0_wbio(s, rbio);
@@ -2199,6 +2220,10 @@ long SSL_ctrl(SSL *s, int cmd, long larg, void *parg)
     case SSL_CTRL_SET_MAX_SEND_FRAGMENT:
         if (larg < 512 || larg > SSL3_RT_MAX_PLAIN_LENGTH)
             return 0;
+#ifndef OPENSSL_NO_KTLS
+        if (s->wbio != NULL && BIO_get_ktls_send(s->wbio))
+            return 0;
+#endif /* OPENSSL_NO_KTLS */
         s->max_send_fragment = larg;
         if (s->max_send_fragment < s->split_send_fragment)
             s->split_send_fragment = s->max_send_fragment;
