@@ -103,7 +103,11 @@ int tls1_change_cipher_state(SSL *s, int which)
     size_t n, i, j, k, cl;
     int reuse_dd = 0;
 #ifndef OPENSSL_NO_KTLS
+#   if defined (__FreeBSD__)
+    struct tls_so_enable tls_en;
+#   else
     struct tls12_crypto_info_aes_gcm_128 crypto_info;
+#endif
     BIO *wbio;
     unsigned char geniv[12];
 #endif
@@ -337,6 +341,49 @@ int tls1_change_cipher_state(SSL *s, int which)
     if (ssl_get_max_send_fragment(s) != SSL3_RT_MAX_PLAIN_LENGTH)
         goto skip_ktls;
 
+#if defined (__FreeBSD__)
+    memset(&tls_en, 0, sizeof(tls_en));
+    if (EVP_CIPHER_mode(c) == EVP_CIPH_GCM_MODE) {
+	 tls_en.crypt_algorithm = CRYPTO_AES_NIST_GCM_16;
+	 tls_en.iv_len = EVP_GCM_TLS_FIXED_IV_LEN;
+	 switch (8 * EVP_CIPHER_key_length(c)) {
+	 case 128:
+	      tls_en.mac_algorthim = CRYPTO_AES_128_NIST_GMAC;
+	      break;
+	 case 192:
+	      tls_en.mac_algorthim = CRYPTO_AES_192_NIST_GMAC;
+	      break;
+	 case 256:
+	      tls_en.mac_algorthim = CRYPTO_AES_256_NIST_GMAC;
+	      break;
+	 default:
+	      goto skip_ktls;
+	 }
+    } else if (EVP_CIPHER_mode(c) == EVP_CIPH_CBC_MODE) {
+	 tls_en.crypt_algorithm = CRYPTO_AES_CBC;
+	 tls_en.iv_len = EVP_CIPHER_iv_length(c);
+	 switch (EVP_CIPHER_nid(c)) {
+	 case NID_aes_128_cbc_hmac_sha1:
+	 case NID_aes_256_cbc_hmac_sha1:
+	      tls_en.mac_algorthim = CRYPTO_SHA1_HMAC;
+	      break;
+	 case NID_aes_128_cbc_hmac_sha256:
+	 case NID_aes_256_cbc_hmac_sha256:
+	      tls_en.mac_algorthim = CRYPTO_SHA2_256_HMAC;
+	      break;
+	 default:
+	      goto skip_ktls;
+        }
+        tls_en.hmac_key = ms;
+	tls_en.hmac_key_len = *mac_secret_size;
+    }
+    tls_en.key_size = EVP_CIPHER_key_length(c);
+    tls_en.tls_vmajor = (s->version >> 8) & 0x000000ff;
+    tls_en.tls_vminor = (s->version & 0x000000ff);
+    tls_en.crypt_key_len = EVP_CIPHER_key_length(c);
+    tls_en.crypt = key;
+    tls_en.iv = iv;
+#else
     /* check that cipher is AES_GCM_128 */
     if (EVP_CIPHER_nid(c) != NID_aes_128_gcm
         || EVP_CIPHER_mode(c) != EVP_CIPH_GCM_MODE
@@ -346,6 +393,7 @@ int tls1_change_cipher_state(SSL *s, int which)
     /* check version is 1.2 */
     if (s->version != TLS1_2_VERSION)
         goto skip_ktls;
+#endif
 
     wbio = s->wbio;
     if (!ossl_assert(wbio != NULL)) {
@@ -365,6 +413,9 @@ int tls1_change_cipher_state(SSL *s, int which)
         goto err;
     }
 
+#if defined (__FreeBSD__)
+    if (BIO_set_ktls(wbio, &tls_en, which & SSL3_CC_WRITE)) {
+#else
     memset(&crypto_info, 0, sizeof(crypto_info));
     crypto_info.info.cipher_type = TLS_CIPHER_AES_GCM_128;
     crypto_info.info.version = s->version;
@@ -381,9 +432,12 @@ int tls1_change_cipher_state(SSL *s, int which)
 
     /* ktls works with user provided buffers directly */
     if (BIO_set_ktls(wbio, &crypto_info, which & SSL3_CC_WRITE)) {
+#endif /*FreeBSD */
         ssl3_release_write_buffer(s);
         SSL_set_options(s, SSL_OP_NO_RENEGOTIATION);
     }
+
+
 
  skip_ktls:
 #endif                          /* OPENSSL_NO_KTLS */
