@@ -4063,6 +4063,73 @@ void SSL_set_info_callback(SSL *ssl,
     ssl->info_callback = cb;
 }
 
+#if defined(__FreeBSD__)
+int SSL_can_use_sendfile(SSL *s)
+{
+	BIO *wbio;
+
+	if (s == NULL)
+		return (0);
+
+	if (s->compress) {
+		return (0);
+	}
+
+	wbio = s->wbio;
+
+	if (wbio == NULL) {
+		return (0);
+	}
+
+	return (!!BIO_should_ktls_flag(wbio));
+}
+
+int SSL_sendfile(int fd, SSL *s, off_t offset, size_t nbytes,
+		 void *_hdtr, int flags)
+{
+	struct sf_hdtr *hdtr = _hdtr;
+	off_t sbytes;
+	int ret;
+
+	if ((fd == -1) || (s == NULL)) {
+		errno = EINVAL;
+		return (-1);
+	}
+	if (SSL_can_use_sendfile(s) == 0) {
+		/* You must be able to use it! */
+		return (-1);
+	}
+	s->rwstate = SSL_WRITING;
+	if (BIO_flush(s->wbio) <= 0) {
+		if (!BIO_should_retry(s->wbio)) {
+			s->rwstate = SSL_NOTHING;
+		} else {
+			errno = EAGAIN;
+		}
+		return (-1);
+	}
+	sbytes = 0;
+	ret = sendfile(fd, BIO_get_fd(s->wbio, NULL), offset, nbytes, hdtr,
+	    &sbytes, flags);
+	if (ret < 0) {
+		BIO_set_error(s->wbio, errno);
+		if ((errno == EAGAIN) ||
+		    (errno == EINTR) ||
+		    (errno == EBUSY)) {
+			BIO_set_retry_write(s->wbio);
+			if (sbytes == 0) {
+				sbytes = -1;
+			}
+			return (sbytes);
+		}
+	} else {
+		BIO_set_error(s->wbio, 0);
+	}
+	s->rwstate = SSL_NOTHING;
+	return (sbytes);
+}
+#endif
+
 /*
  * One compiler (Diab DCC) doesn't like argument names in returned function
  * pointer.

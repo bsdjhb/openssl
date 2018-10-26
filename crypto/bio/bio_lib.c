@@ -202,6 +202,16 @@ void BIO_set_flags(BIO *b, int flags)
     b->flags |= flags;
 }
 
+void BIO_set_error(BIO *b, int error)
+{
+    b->error_reason = error;
+}
+
+int BIO_get_error(BIO *b)
+{
+    return b->error_reason;
+}
+
 BIO_callback_fn BIO_get_callback(const BIO *b)
 {
     return b->callback;

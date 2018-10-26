@@ -1522,6 +1522,11 @@ __owur int SSL_set_wfd(SSL *s, int fd);
 void SSL_set0_rbio(SSL *s, BIO *rbio);
 void SSL_set0_wbio(SSL *s, BIO *wbio);
 void SSL_set_bio(SSL *s, BIO *rbio, BIO *wbio);
+#ifdef __FreeBSD__
+int SSL_can_use_sendfile(SSL *ssl);
+int SSL_sendfile(int fd, SSL *s, off_t offset, size_t nbytes,
+		 void *hdtr, int flags);
+#endif
 __owur BIO *SSL_get_rbio(const SSL *s);
 __owur BIO *SSL_get_wbio(const SSL *s);
 __owur int SSL_set_cipher_list(SSL *s, const char *str);

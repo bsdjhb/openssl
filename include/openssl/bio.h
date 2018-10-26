@@ -589,6 +589,8 @@ void BIO_set_next(BIO *b, BIO *next);
 BIO *BIO_get_retry_BIO(BIO *bio, int *reason);
 int BIO_get_retry_reason(BIO *bio);
 void BIO_set_retry_reason(BIO *bio, int reason);
+int BIO_get_error(BIO *bio);
+void BIO_set_error(BIO *bio, int reason);
 BIO *BIO_dup_chain(BIO *in);
 
 int BIO_nread0(BIO *bio, char **buf);

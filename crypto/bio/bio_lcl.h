@@ -122,6 +122,7 @@ struct bio_st {
     int shutdown;
     int flags;                  /* extra storage */
     int retry_reason;
+    int error_reason;
     int num;
     void *ptr;
     struct bio_st *next_bio;    /* used by filter BIOs */
