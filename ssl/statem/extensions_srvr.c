@@ -567,9 +567,12 @@ int tls_parse_ctos_use_srtp(SSL *s, PACKET *pkt, unsigned int context, X509 *x,
 int tls_parse_ctos_etm(SSL *s, PACKET *pkt, unsigned int context, X509 *x,
                        size_t chainidx)
 {
+
+#ifdef OPENSSL_NO_KTLS
+	/* netflix boring CBC cannot do encrypt then mac */
     if (!(s->options & SSL_OP_NO_ENCRYPT_THEN_MAC))
         s->ext.use_etm = 1;
-
+#endif
     return 1;
 }
 
