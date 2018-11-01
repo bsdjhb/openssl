@@ -115,6 +115,9 @@
 #include <openssl/rand.h>
 #include <openssl/objects.h>
 #include <openssl/evp.h>
+#ifdef CHSSL_OFFLOAD
+#include "ssl_tom.h"
+#endif
 
 static const SSL_METHOD *ssl23_get_client_method(int ver);
 static int ssl23_client_hello(SSL *s);
@@ -221,6 +224,10 @@ int ssl23_connect(SSL *s)
             ret = ssl23_client_hello(s);
             if (ret <= 0)
                 goto end;
+#ifdef CHSSL_OFFLOAD
+            if (chssl_new(s))
+                ssl_tls_offload(s);
+#endif
             s->state = SSL23_ST_CR_SRVR_HELLO_A;
             s->init_num = 0;
 
