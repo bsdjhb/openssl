@@ -78,10 +78,9 @@ BIO *BIO_new_socket(int fd, int close_flag)
     if (rc == 0) {
        switch (mode) {
        case TLS_TOM_BOTH:
-           BIO_set_chofld_flag(ret);
-           break;
        case TLS_TOM_TXONLY:
-           /* TODO */
+           /* For TXONLY, chssl_program_hwkey_context will DTRT. */
+           BIO_set_chofld_flag(ret);
            break;
        }
     }
