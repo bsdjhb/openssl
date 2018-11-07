@@ -67,9 +67,25 @@ BIO *BIO_new_socket(int fd, int close_flag)
     BIO_set_fd(ret, fd, close_flag);
 #ifdef CHELSIO_TLS_OFFLOAD
     int mode, rc;
+#ifdef __linux__
     rc = ioctl(fd, IOCTL_TLSOM_GET_TLS_TOM, &mode);
     if (!rc && mode)
         BIO_set_chofld_flag(ret);
+#else
+    socklen_t optlen;
+    optlen = sizeof(mode);
+    rc = getsockopt(fd, IPPROTO_TCP, TCP_TLSOM_GET_TLS_TOM, &mode, &optlen);
+    if (rc == 0) {
+       switch (mode) {
+       case TLS_TOM_BOTH:
+           BIO_set_chofld_flag(ret);
+           break;
+       case TLS_TOM_TXONLY:
+           /* TODO */
+           break;
+       }
+    }
+#endif
 #endif
     return ret;
 }
@@ -177,10 +193,19 @@ static long sock_ctrl(BIO *b, int cmd, long num, void *ptr)
 #ifdef CHELSIO_TLS_OFFLOAD
     case BIO_CTRL_SET_OFFLOAD_KEY:
         key_context = (struct tls_key_context *)ptr;
+#ifdef __linux__
         ret = ioctl(b->num, IOCTL_TLSOM_SET_TLS_CONTEXT, key_context);
+#else
+        ret = setsockopt(b->num, IPPROTO_TCP, TCP_TLSOM_SET_TLS_CONTEXT,
+            key_context, sizeof(*key_context));
+#endif
         break;
     case BIO_CTRL_SET_OFFLOAD_CLEAR_KEY:
+#ifdef __linux__
         ret = ioctl(b->num, IOCTL_TLSOM_CLR_TLS_TOM);
+#else
+        ret = setsockopt(b->num, IPPROTO_TCP, TCP_TLSOM_CLR_TLS_TOM, NULL, 0);
+#endif
         break;
 #endif
     default:

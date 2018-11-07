@@ -15,10 +15,30 @@ void chssl_program_hwkey_context(SSL *s, int rw, int state);
 #define GHASH_SIZE              16
 #define MAX_TLS_KSZ     (2*MAX_MAC_KSZ + MAX_CIPHER_KSZ)
 
+#ifdef __linux__
 #define IOCTL_TLSOM_SET_TLS_CONTEXT 201 /* Program Key Context on HW */
 #define IOCTL_TLSOM_GET_TLS_TOM     202 /* Query the TLS offload mode */
 #define IOCTL_TLSOM_CLR_TLS_TOM     203 /* Clear the Key */
 #define IOCTL_TLSOM_CLR_QUIES     204   /* Clear the Quiesec */
+#else
+/* Set with 'struct tls_key_context'. */
+#define	TCP_TLSOM_SET_TLS_CONTEXT	(TCP_VENDOR)
+
+/* Get returns int of enabled (1) / disabled (0). */
+#define	TCP_TLSOM_GET_TLS_TOM		(TCP_VENDOR + 1)
+
+enum {
+	TLS_TOM_NONE = 0,
+	TLS_TOM_TXONLY,
+	TLS_TOM_BOTH
+};
+
+/* Set with no value. */
+#define	TCP_TLSOM_CLR_TLS_TOM		(TCP_VENDOR + 2)
+
+/* Set with no value. */
+#define	TCP_TLSOM_CLR_QUIES		(TCP_VENDOR + 3)
+#endif
 
 enum {
     TLS_OFLD_FALSE = 0,
