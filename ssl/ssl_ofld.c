@@ -398,6 +398,7 @@ void chssl_program_hwkey_context(SSL *s, int rw, int state)
     if (ret)
         goto end;
     if (rw & KEY_WRITE_TX) {
+        /* XXX: wbio? */
         BIO_set_offload_tx_flag(rbio);
     } else {
         BIO_set_offload_rx_flag(rbio);
