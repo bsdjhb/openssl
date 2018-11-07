@@ -8,6 +8,7 @@
  */
 
 #include "ssl_locl.h"
+#include "ssl_ofld.h"
 
 int ssl3_do_change_cipher_spec(SSL *s)
 {
@@ -32,6 +33,18 @@ int ssl3_do_change_cipher_spec(SSL *s)
 
     if (!s->method->ssl3_enc->change_cipher_state(s, i))
         return 0;
+
+#ifdef CHELSIO_TLS_OFFLOAD
+    if (!s->server) {
+        if (s->wbio) {
+            chssl_program_hwkey_context(s, SSL3_CC_READ, SSL_ST_CONNECT);
+        }
+    } else {
+        if (s->wbio) {
+            chssl_program_hwkey_context(s, SSL3_CC_READ, SSL_ST_ACCEPT);
+        }
+    }
+#endif
 
     return 1;
 }

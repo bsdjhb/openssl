@@ -11,6 +11,7 @@
 #include <errno.h>
 #include "bio_lcl.h"
 #include "internal/cryptlib.h"
+#include "ssl/ssl_ofld.h"
 
 #ifndef OPENSSL_NO_SOCK
 
@@ -64,6 +65,12 @@ BIO *BIO_new_socket(int fd, int close_flag)
     if (ret == NULL)
         return NULL;
     BIO_set_fd(ret, fd, close_flag);
+#ifdef CHELSIO_TLS_OFFLOAD
+    int mode, rc;
+    rc = ioctl(fd, IOCTL_TLSOM_GET_TLS_TOM, &mode);
+    if (!rc && mode)
+        BIO_set_chofld_flag(ret);
+#endif
     return ret;
 }
 
@@ -124,6 +131,9 @@ static long sock_ctrl(BIO *b, int cmd, long num, void *ptr)
 {
     long ret = 1;
     int *ip;
+#ifdef CHELSIO_TLS_OFFLOAD
+    struct tls_key_context *key_context;
+#endif
 
     switch (cmd) {
     case BIO_C_SET_FD:
@@ -151,6 +161,28 @@ static long sock_ctrl(BIO *b, int cmd, long num, void *ptr)
     case BIO_CTRL_FLUSH:
         ret = 1;
         break;
+     case BIO_CTRL_GET_OFFLOAD_TX:
+         return BIO_should_offload_tx_flag(b);
+     case BIO_CTRL_SET_OFFLOAD_TX_CTRL_MSG:
+         BIO_set_offload_tx_ctrl_msg_flag(b);
+	 b->ptr = (void *)num;
+         ret = 0;
+         break;
+     case BIO_CTRL_CLEAR_OFFLOAD_TX_CTRL_MSG:
+         BIO_clear_offload_tx_ctrl_msg_flag(b);
+         ret = 0;
+         break;
+     case BIO_CTRL_GET_OFFLOAD_RX:
+         return BIO_should_offload_rx_flag(b);
+#ifdef CHELSIO_TLS_OFFLOAD
+    case BIO_CTRL_SET_OFFLOAD_KEY:
+        key_context = (struct tls_key_context *)ptr;
+        ret = ioctl(b->num, IOCTL_TLSOM_SET_TLS_CONTEXT, key_context);
+        break;
+    case BIO_CTRL_SET_OFFLOAD_CLEAR_KEY:
+        ret = ioctl(b->num, IOCTL_TLSOM_CLR_TLS_TOM);
+        break;
+#endif
     default:
         ret = 0;
         break;

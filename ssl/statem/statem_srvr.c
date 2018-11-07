@@ -650,6 +650,10 @@ WRITE_TRAN ossl_statem_server_write_transition(SSL *s)
 
     case TLS_ST_SW_SESSION_TICKET:
         st->hand_state = TLS_ST_SW_CHANGE;
+#ifdef CHELSIO_TLS_OFFLOAD
+            if (BIO_get_chofld_flag(s->rbio))
+                statem_flush(s);
+#endif
         return WRITE_TRAN_CONTINUE;
 
     case TLS_ST_SW_CHANGE:

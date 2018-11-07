@@ -1069,6 +1069,7 @@ int SSL_is_init_finished(const SSL *s);
 # define SSL_ST_READ_HEADER                      0xF0
 # define SSL_ST_READ_BODY                        0xF1
 # define SSL_ST_READ_DONE                        0xF2
+# define SSL_ST_READ_ERROR                       0xF3
 
 /*-
  * Obtain latest Finished message

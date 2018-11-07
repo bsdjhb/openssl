@@ -10,6 +10,7 @@
 
 #include <stdio.h>
 #include "ssl_locl.h"
+#include "ssl_ofld.h"
 #include <openssl/comp.h>
 #include <openssl/evp.h>
 #include <openssl/kdf.h>
@@ -98,6 +99,7 @@ int tls1_change_cipher_state(SSL *s, int which)
     EVP_PKEY *mac_key;
     size_t n, i, j, k, cl;
     int reuse_dd = 0;
+    BIO *wbio;
 
     c = s->s3->tmp.new_sym_enc;
     m = s->s3->tmp.new_hash;
@@ -317,6 +319,22 @@ int tls1_change_cipher_state(SSL *s, int which)
         goto err;
     }
     s->statem.enc_write_state = ENC_WRITE_STATE_VALID;
+
+#ifdef CHELSIO_TLS_OFFLOAD
+    wbio = s->wbio;
+    if (!wbio)
+        goto skip_offload;
+
+    if (which == SSL3_CHANGE_CIPHER_SERVER_WRITE) {
+        chssl_program_hwkey_context(s, SSL3_CC_WRITE, SSL_ST_ACCEPT);
+	//statem_flush(s);
+    } else if (which == SSL3_CHANGE_CIPHER_CLIENT_WRITE) {
+        chssl_program_hwkey_context(s, SSL3_CC_WRITE, SSL_ST_CONNECT);
+	//statem_flush(s);
+    }
+
+skip_offload:
+#endif
 
 #ifdef SSL_DEBUG
     printf("which = %04X\nkey=", which);

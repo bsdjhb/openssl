@@ -797,7 +797,8 @@ int do_ssl3_write(SSL *s, int type, const unsigned char *buf,
     }
 
     /* Explicit IV length, block ciphers appropriate version flag */
-    if (s->enc_write_ctx && SSL_USE_EXPLICIT_IV(s) && !SSL_TREAT_AS_TLS13(s)) {
+    if (s->enc_write_ctx && SSL_USE_EXPLICIT_IV(s) && !SSL_TREAT_AS_TLS13(s)
+            && !BIO_get_offload_tx(s->wbio)) {
         int mode = EVP_CIPHER_CTX_mode(s->enc_write_ctx);
         if (mode == EVP_CIPH_CBC_MODE) {
             /* TODO(size_t): Convert me */
@@ -951,7 +952,8 @@ int do_ssl3_write(SSL *s, int type, const unsigned char *buf,
          * in the wb->buf
          */
 
-        if (!SSL_WRITE_ETM(s) && mac_size != 0) {
+        if (!SSL_WRITE_ETM(s) && mac_size != 0
+                && !BIO_get_offload_tx(s->wbio)) {
             unsigned char *mac;
 
             if (!WPACKET_allocate_bytes(thispkt, mac_size, &mac)
@@ -999,7 +1001,7 @@ int do_ssl3_write(SSL *s, int type, const unsigned char *buf,
             }
             goto err;
         }
-    } else {
+    } else if (!BIO_get_offload_tx(s->wbio)) {
         if (s->method->ssl3_enc->enc(s, wr, numpipes, 1) < 1) {
             if (!ossl_statem_in_error(s)) {
                 SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_F_DO_SSL3_WRITE,
@@ -1149,6 +1151,9 @@ int ssl3_write_pending(SSL *s, int type, const unsigned char *buf, size_t len,
                           (unsigned int)SSL3_BUFFER_get_left(&wb[currbuf]));
             if (i >= 0)
                 tmpwrit = i;
+
+            if (BIO_get_offload_tx(s->wbio) && type != SSL3_RT_APPLICATION_DATA)
+                (void)BIO_flush(s->wbio);
         } else {
             SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_F_SSL3_WRITE_PENDING,
                      SSL_R_BIO_NOT_SET);

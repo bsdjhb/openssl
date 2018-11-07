@@ -225,6 +225,11 @@ int ssl3_get_record(SSL *s)
                          ERR_R_INTERNAL_ERROR);
                 return -1;
             }
+
+            if (BIO_get_offload_rx(s->rbio) && (*p == 0x7F)) {
+                RECORD_LAYER_set_rstate(&s->rlayer, SSL_ST_READ_ERROR);
+            }
+
             /*
              * The first record received by the server may be a V2ClientHello.
              */
@@ -393,6 +398,18 @@ int ssl3_get_record(SSL *s)
             }
         }
 
+        if (BIO_get_offload_rx(s->rbio) && 
+            RECORD_LAYER_get_rstate(&s->rlayer) == SSL_ST_READ_ERROR) {
+            i = rr[num_recs].length;
+            n = ssl3_read_n(s, i, i, 1, 0);  
+            RECORD_LAYER_set_rstate(&s->rlayer, SSL_ST_READ_HEADER);
+            if (n <= 0)
+                return (n);
+            SSLfatal(s, SSL_AD_BAD_RECORD_MAC, SSL_F_SSL3_GET_RECORD,
+                   SSL_R_DECRYPTION_FAILED_OR_BAD_RECORD_MAC);
+            return -1;
+        }
+
         /*
          * s->rlayer.rstate == SSL_ST_READ_BODY, get and decode the data.
          * Calculate how much more data we need to read for the rest of the
@@ -495,7 +512,7 @@ int ssl3_get_record(SSL *s)
      * If in encrypt-then-mac mode calculate mac from encrypted record. All
      * the details below are public so no timing details can leak.
      */
-    if (SSL_READ_ETM(s) && s->read_hash) {
+    if (SSL_READ_ETM(s) && s->read_hash && !BIO_get_offload_rx(s->rbio)) {
         unsigned char *mac;
         /* TODO(size_t): convert this to do size_t properly */
         imac_size = EVP_MD_CTX_size(s->read_hash);
@@ -526,7 +543,11 @@ int ssl3_get_record(SSL *s)
 
     first_rec_len = rr[0].length;
 
-    enc_err = s->method->ssl3_enc->enc(s, rr, num_recs, 0);
+    if (BIO_get_offload_rx(s->rbio)) {
+	enc_err = 1;
+    } else {
+	enc_err = s->method->ssl3_enc->enc(s, rr, num_recs, 0);
+    }
 
     /*-
      * enc_err is:
@@ -576,6 +597,7 @@ int ssl3_get_record(SSL *s)
     /* r->length is now the compressed data plus mac */
     if ((sess != NULL) &&
         (s->enc_read_ctx != NULL) &&
+        !BIO_get_offload_rx(s->rbio) &&
         (!SSL_READ_ETM(s) && EVP_MD_CTX_md(s->read_hash) != NULL)) {
         /* s->read_hash != NULL => mac_size != -1 */
         unsigned char *mac = NULL;
