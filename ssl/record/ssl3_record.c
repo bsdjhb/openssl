@@ -401,10 +401,10 @@ int ssl3_get_record(SSL *s)
         if (BIO_get_offload_rx(s->rbio) && 
             RECORD_LAYER_get_rstate(&s->rlayer) == SSL_ST_READ_ERROR) {
             i = rr[num_recs].length;
-            n = ssl3_read_n(s, i, i, 1, 0);  
+            rret = ssl3_read_n(s, i, i, 1, 0, &n);
             RECORD_LAYER_set_rstate(&s->rlayer, SSL_ST_READ_HEADER);
-            if (n <= 0)
-                return (n);
+            if (rret <= 0)
+                return (rret);
             SSLfatal(s, SSL_AD_BAD_RECORD_MAC, SSL_F_SSL3_GET_RECORD,
                    SSL_R_DECRYPTION_FAILED_OR_BAD_RECORD_MAC);
             return -1;
