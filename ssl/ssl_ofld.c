@@ -10,6 +10,9 @@
 #include <stdio.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
+#ifdef __FreeBSD__
+#include <sys/endian.h>
+#endif
 #include <openssl/bio.h>
 #include <openssl/ossl_typ.h>
 #include <openssl/comp.h>
