@@ -139,20 +139,20 @@ static long sock_ctrl(BIO *b, int cmd, long num, void *ptr)
         {
             int mode, rc;
 #ifdef __linux__
-            rc = ioctl(fd, IOCTL_TLSOM_GET_TLS_TOM, &mode);
+            rc = ioctl(b->num, IOCTL_TLSOM_GET_TLS_TOM, &mode);
             if (!rc && mode)
-                BIO_set_chofld_flag(ret);
+                BIO_set_chofld_flag(b);
 #else
             socklen_t optlen;
             optlen = sizeof(mode);
-            rc = getsockopt(fd, IPPROTO_TCP, TCP_TLSOM_GET_TLS_TOM, &mode,
+            rc = getsockopt(b->num, IPPROTO_TCP, TCP_TLSOM_GET_TLS_TOM, &mode,
                 &optlen);
             if (rc == 0) {
                 switch (mode) {
                 case TLS_TOM_BOTH:
                 case TLS_TOM_TXONLY:
                     /* For TXONLY, chssl_program_hwkey_context will DTRT. */
-                    BIO_set_chofld_flag(ret);
+                    BIO_set_chofld_flag(b);
                     break;
                 }
             }
