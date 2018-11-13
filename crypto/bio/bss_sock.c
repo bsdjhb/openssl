@@ -65,27 +65,6 @@ BIO *BIO_new_socket(int fd, int close_flag)
     if (ret == NULL)
         return NULL;
     BIO_set_fd(ret, fd, close_flag);
-#ifdef CHELSIO_TLS_OFFLOAD
-    int mode, rc;
-#ifdef __linux__
-    rc = ioctl(fd, IOCTL_TLSOM_GET_TLS_TOM, &mode);
-    if (!rc && mode)
-        BIO_set_chofld_flag(ret);
-#else
-    socklen_t optlen;
-    optlen = sizeof(mode);
-    rc = getsockopt(fd, IPPROTO_TCP, TCP_TLSOM_GET_TLS_TOM, &mode, &optlen);
-    if (rc == 0) {
-       switch (mode) {
-       case TLS_TOM_BOTH:
-       case TLS_TOM_TXONLY:
-           /* For TXONLY, chssl_program_hwkey_context will DTRT. */
-           BIO_set_chofld_flag(ret);
-           break;
-       }
-    }
-#endif
-#endif
     return ret;
 }
 
@@ -156,6 +135,30 @@ static long sock_ctrl(BIO *b, int cmd, long num, void *ptr)
         b->num = *((int *)ptr);
         b->shutdown = (int)num;
         b->init = 1;
+#ifdef CHELSIO_TLS_OFFLOAD
+        {
+            int mode, rc;
+#ifdef __linux__
+            rc = ioctl(fd, IOCTL_TLSOM_GET_TLS_TOM, &mode);
+            if (!rc && mode)
+                BIO_set_chofld_flag(ret);
+#else
+            socklen_t optlen;
+            optlen = sizeof(mode);
+            rc = getsockopt(fd, IPPROTO_TCP, TCP_TLSOM_GET_TLS_TOM, &mode,
+                &optlen);
+            if (rc == 0) {
+                switch (mode) {
+                case TLS_TOM_BOTH:
+                case TLS_TOM_TXONLY:
+                    /* For TXONLY, chssl_program_hwkey_context will DTRT. */
+                    BIO_set_chofld_flag(ret);
+                    break;
+                }
+            }
+#endif
+        }
+#endif
         break;
     case BIO_C_GET_FD:
         if (b->init) {
