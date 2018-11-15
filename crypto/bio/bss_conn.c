@@ -11,6 +11,7 @@
 #include <errno.h>
 
 #include "bio_lcl.h"
+#include "ssl/ssl_ofld.h"
 
 #ifndef OPENSSL_NO_SOCK
 
@@ -179,6 +180,28 @@ static int conn_state(BIO *b, BIO_CONNECT *c)
                 goto exit_loop;
             } else {
                 c->state = BIO_CONN_S_OK;
+#ifdef CHELSIO_TLS_OFFLOAD
+                int mode, rc;
+#ifdef __linux__
+                rc = ioctl(b->num, IOCTL_TLSOM_GET_TLS_TOM, &mode);
+                if (!rc && mode)
+                    BIO_set_chofld_flag(b);
+#else
+                socklen_t optlen;
+                optlen = sizeof(mode);
+                rc = getsockopt(b->num, IPPROTO_TCP, TCP_TLSOM_GET_TLS_TOM,
+                    &mode, &optlen);
+                if (rc == 0) {
+                    switch (mode) {
+                    case TLS_TOM_BOTH:
+                    case TLS_TOM_TXONLY:
+                        /* For TXONLY, chssl_program_hwkey_context will DTRT. */
+                        BIO_set_chofld_flag(b);
+                        break;
+                    }
+                }
+#endif
+#endif
             }
             break;
 
@@ -343,6 +366,9 @@ static long conn_ctrl(BIO *b, int cmd, long num, void *ptr)
     const char **pptr = NULL;
     long ret = 1;
     BIO_CONNECT *data;
+#ifdef CHELSIO_TLS_OFFLOAD
+    struct tls_key_context *key_context;
+#endif
 
     data = (BIO_CONNECT *)b->ptr;
 
@@ -488,6 +514,37 @@ static long conn_ctrl(BIO *b, int cmd, long num, void *ptr)
             *fptr = data->info_callback;
         }
         break;
+     case BIO_CTRL_GET_OFFLOAD_TX:
+         return BIO_should_offload_tx_flag(b);
+     case BIO_CTRL_SET_OFFLOAD_TX_CTRL_MSG:
+         BIO_set_offload_tx_ctrl_msg_flag(b);
+	 b->ptr = (void *)num;
+         ret = 0;
+         break;
+     case BIO_CTRL_CLEAR_OFFLOAD_TX_CTRL_MSG:
+         BIO_clear_offload_tx_ctrl_msg_flag(b);
+         ret = 0;
+         break;
+     case BIO_CTRL_GET_OFFLOAD_RX:
+         return BIO_should_offload_rx_flag(b);
+#ifdef CHELSIO_TLS_OFFLOAD
+    case BIO_CTRL_SET_OFFLOAD_KEY:
+        key_context = (struct tls_key_context *)ptr;
+#ifdef __linux__
+        ret = ioctl(b->num, IOCTL_TLSOM_SET_TLS_CONTEXT, key_context);
+#else
+        ret = setsockopt(b->num, IPPROTO_TCP, TCP_TLSOM_SET_TLS_CONTEXT,
+            key_context, sizeof(*key_context));
+#endif
+        break;
+    case BIO_CTRL_SET_OFFLOAD_CLEAR_KEY:
+#ifdef __linux__
+        ret = ioctl(b->num, IOCTL_TLSOM_CLR_TLS_TOM);
+#else
+        ret = setsockopt(b->num, IPPROTO_TCP, TCP_TLSOM_CLR_TLS_TOM, NULL, 0);
+#endif
+        break;
+#endif
     default:
         ret = 0;
         break;
