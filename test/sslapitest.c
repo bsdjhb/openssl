@@ -780,7 +780,8 @@ static int execute_test_large_message(const SSL_METHOD *smeth,
     return testresult;
 }
 
-#if !defined(OPENSSL_NO_TLS1_2) && !defined(OPENSSL_NO_KTLS)
+#if !defined(OPENSSL_NO_TLS1_2) && !defined(OPENSSL_NO_KTLS) \
+    && !defined(OPENSSL_NO_SOCK)
 
 /* sock must be connected */
 static int ktls_chk_platform(int sock)
@@ -6878,7 +6879,8 @@ int setup_tests(void)
         return 0;
     }
 
-#if !defined(OPENSSL_NO_TLS1_2) && !defined(OPENSSL_NO_KTLS)
+#if !defined(OPENSSL_NO_TLS1_2) && !defined(OPENSSL_NO_KTLS) \
+    && !defined(OPENSSL_NO_SOCK)
     ADD_TEST(test_ktls_client_server);
     ADD_TEST(test_ktls_no_client_server);
     ADD_TEST(test_ktls_client_no_server);
