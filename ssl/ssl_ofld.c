@@ -10,9 +10,6 @@
 #include <stdio.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
-#ifdef __FreeBSD__
-#include <sys/endian.h>
-#endif
 #include <openssl/bio.h>
 #include <openssl/ossl_typ.h>
 #include <openssl/comp.h>
@@ -26,11 +23,11 @@
 int CHSSL_EVP_Digest(const void *data,
                      void *md, unsigned long algorithm_mac)
 {
+   unsigned char *temp = md;
     int ret = 1, i;
 
    if (algorithm_mac == SSL_SHA1){
         SHA_CTX sha1ctx;
-        unsigned int *temp = md;
 
         SHA1_Init(&sha1ctx);
         SHA1_Update(&sha1ctx, data, SHA_CBLOCK);
@@ -39,7 +36,6 @@ int CHSSL_EVP_Digest(const void *data,
         l2n(sha1ctx.h2, temp);
         l2n(sha1ctx.h3, temp);
    } else if (algorithm_mac == SSL_SHA256) {
-        unsigned int *temp = md;
         SHA256_CTX sha256ctx;
         SHA256_Init(&sha256ctx);
         SHA256_Update(&sha256ctx, data, SHA256_CBLOCK);
@@ -53,9 +49,7 @@ int CHSSL_EVP_Digest(const void *data,
         SHA384_Update(&sha384ctx, data, SHA512_BLOCK);
 
         for (i = 0; i < SHA512_DIGEST_LENGTH / 8; i++)
-            *((unsigned long long *)md + i) =
-                htobe64(sha384ctx.h[i]);
-
+                l2n8(sha384ctx.h[i], temp);
    }
 
    return ret;
