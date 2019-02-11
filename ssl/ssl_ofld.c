@@ -35,6 +35,7 @@ int CHSSL_EVP_Digest(const void *data,
         l2n(sha1ctx.h1, temp);
         l2n(sha1ctx.h2, temp);
         l2n(sha1ctx.h3, temp);
+        l2n(sha1ctx.h4, temp);
    } else if (algorithm_mac == SSL_SHA256) {
         SHA256_CTX sha256ctx;
         SHA256_Init(&sha256ctx);
