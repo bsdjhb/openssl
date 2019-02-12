@@ -217,6 +217,11 @@ static int ssl_key_context(SSL *s, struct tls_key_context *kctx, int rw, int sta
         return ret;
     }
 
+    if (rw == SSL3_CC_READ && SSL_READ_ETM(s))
+        return ret;
+    else if (rw == SSL3_CC_WRITE && SSL_WRITE_ETM(s))
+        return ret;
+
     c = s->s3->tmp.new_sym_enc;
     kctx->l_p_key = rw;
 
