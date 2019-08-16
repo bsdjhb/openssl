@@ -347,6 +347,8 @@ int tls1_change_cipher_state(SSL *s, int which)
 	 tls_en.cipher_algorithm = CRYPTO_AES_NIST_GCM_16;
 	 tls_en.iv_len = EVP_GCM_TLS_FIXED_IV_LEN;
     } else if (EVP_CIPHER_mode(c) == EVP_CIPH_CBC_MODE) {
+         if (s->ext.use_etm)
+             goto skip_ktls;
 	 tls_en.cipher_algorithm = CRYPTO_AES_CBC;
 	 tls_en.iv_len = EVP_CIPHER_iv_length(c);
 	 switch (EVP_CIPHER_nid(c)) {
