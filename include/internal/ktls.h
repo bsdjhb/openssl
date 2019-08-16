@@ -11,25 +11,26 @@
 # ifndef HEADER_INTERNAL_KTLS
 #  define HEADER_INTERNAL_KTLS
 
-#if defined (__FreeBSD__)
-#include <sys/types.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <sys/socket.h>
-#include <crypto/cryptodev.h>
-#if defined (TCP_TLS_ENABLE)
-#include <sys/sockbuf_tls.h>
+#  if defined(__FreeBSD__)
+#   include <sys/types.h>
+#   include <netinet/in.h>
+#   include <netinet/tcp.h>
+#   include <sys/socket.h>
+#   include <crypto/cryptodev.h>
+#   if defined (TCP_TXTLS_ENABLE)
+#     include <sys/ktls.h>
+
 static ossl_inline int ktls_enable(int fd)
 {
     return 0;
 }
 
 static ossl_inline int ktls_start(int fd,
-                                  struct tls_so_enable *tls_en,
+                                  struct tls_enable *tls_en,
                                   size_t len, int is_tx)
 {
      if (is_tx)
-	  return setsockopt(fd, IPPROTO_TCP, TCP_TLS_ENABLE,
+	  return setsockopt(fd, IPPROTO_TCP, TCP_TXTLS_ENABLE,
 		       tls_en, sizeof(*tls_en)) ? 0 : 1;
      else
 	  return 0;
@@ -47,10 +48,8 @@ static ossl_inline int ktls_send_ctrl_message(int fd, unsigned char record_type,
     msg.msg_control = buf;
     msg.msg_controllen = sizeof(buf);
     cmsg = CMSG_FIRSTHDR(&msg);
-#if defined(TCP_TLS_ENABLE)
     cmsg->cmsg_level = IPPROTO_TCP;
     cmsg->cmsg_type = TLS_SET_RECORD_TYPE;
-#endif
     cmsg->cmsg_len = CMSG_LEN(cmsg_len);
     *((unsigned char *)CMSG_DATA(cmsg)) = record_type;
     msg.msg_controllen = cmsg->cmsg_len;
@@ -62,20 +61,21 @@ static ossl_inline int ktls_send_ctrl_message(int fd, unsigned char record_type,
 
     return sendmsg(fd, &msg, 0);
 }
-#else
-struct tls_so_enable {
-        const uint8_t *hmac_key;
-        const uint8_t *crypt;
-        const uint8_t *iv;
-        uint32_t crypt_algorithm; /* e.g. CRYPTO_AES_CBC */
-        uint32_t mac_algorthim;   /* e.g. CRYPTO_SHA2_256_HMAC */
-        uint32_t key_size;        /* Length of the key */
-        int hmac_key_len;
-        int crypt_key_len;
-        int iv_len;
-        uint8_t tls_vmajor;
-        uint8_t tls_vminor;
+#   else                        /* TCP_TXTLS_ENABLE */
+struct tls_enable {
+	const uint8_t *cipher_key;
+	const uint8_t *iv;		/* Implicit IV. */
+	const uint8_t *auth_key;
+	int	cipher_algorithm;	/* e.g. CRYPTO_AES_CBC */
+	int	cipher_key_len;
+	int	iv_len;
+	int	auth_algorithm;		/* e.g. CRYPTO_SHA2_256_HMAC */
+	int	auth_key_len;
+	int	flags;
+	uint8_t tls_vmajor;
+	uint8_t tls_vminor;
 };
+
 /* Dummy functions here */
 static ossl_inline int ktls_enable(int fd)
 {
@@ -93,9 +93,8 @@ static ossl_inline int ktls_send_ctrl_message(int fd, unsigned char record_type,
     return -1;
 }
 
-#endif
-#endif /* __FreeBSD */
-
+#   endif                        /* TCP_TXTLS_ENABLE */
+#  endif                         /* __FreeBSD__ */
 
 #  if defined(OPENSSL_SYS_LINUX)
 #   include <linux/version.h>

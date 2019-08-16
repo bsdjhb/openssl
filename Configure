@@ -1593,25 +1593,17 @@ unless ($disabled{ktls}) {
             $disabled{ktls} = "too-old-kernel";
         }
     } elsif ($target =~ m/^BSD/) {
-        my $usr = "/usr/$config{cross_compile_prefix}";
-        chop($usr);
-        if ($config{cross_compile_prefix} eq "") {
-            $usr = "/usr";
-        }
-        my $minver = 1200083;
-        my @verstr = split(" ",`cat $usr/include/sys/param.h | grep __FreeBSD_version | grep define`);
-
-        if ($verstr[2] < $minver) {
+        my $cc = $config{CROSS_COMPILE}.$config{CC};
+        system("echo '#include <sys/ktls.h>' | $cc -E - >/dev/null 2>&1");
+        if ($? != 0) {
             $disabled{ktls} = "too-old-freebsd";
         }
-
     } else {
         $disabled{ktls}  = "not-linux-or-freebsd";
     }
 }
 
 push @{$config{openssl_other_defines}}, "OPENSSL_NO_KTLS" if ($disabled{ktls});
-printf( "OPENSSL_NO_KTLS\n") if ($disabled{ktls});
 
 # Finish up %config by appending things the user gave us on the command line
 # apart from "make variables"

@@ -148,7 +148,7 @@ static long sock_ctrl(BIO *b, int cmd, long num, void *ptr)
     int *ip;
 # ifndef OPENSSL_NO_KTLS
 #   if defined (__FreeBSD__)
-    struct tls_so_enable *crypto_info;
+    struct tls_enable *crypto_info;
 #   else
     struct tls12_crypto_info_aes_gcm_128 *crypto_info;
 #   endif
@@ -184,7 +184,7 @@ static long sock_ctrl(BIO *b, int cmd, long num, void *ptr)
 # ifndef OPENSSL_NO_KTLS
     case BIO_CTRL_SET_KTLS_SEND:
 #if defined (__FreeBSD__)
-        crypto_info = (struct tls_so_enable *)ptr;
+        crypto_info = (struct tls_enable *)ptr;
 #else
         crypto_info = (struct tls12_crypto_info_aes_gcm_128 *)ptr;
 #endif
