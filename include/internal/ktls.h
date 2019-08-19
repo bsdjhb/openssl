@@ -13,12 +13,11 @@
 
 #  if defined(__FreeBSD__)
 #   include <sys/types.h>
+#   include <sys/socket.h>
+#   include <sys/ktls.h>
 #   include <netinet/in.h>
 #   include <netinet/tcp.h>
-#   include <sys/socket.h>
 #   include <crypto/cryptodev.h>
-#   if defined (TCP_TXTLS_ENABLE)
-#     include <sys/ktls.h>
 
 static ossl_inline int ktls_enable(int fd)
 {
@@ -61,39 +60,6 @@ static ossl_inline int ktls_send_ctrl_message(int fd, unsigned char record_type,
 
     return sendmsg(fd, &msg, 0);
 }
-#   else                        /* TCP_TXTLS_ENABLE */
-struct tls_enable {
-	const uint8_t *cipher_key;
-	const uint8_t *iv;		/* Implicit IV. */
-	const uint8_t *auth_key;
-	int	cipher_algorithm;	/* e.g. CRYPTO_AES_CBC */
-	int	cipher_key_len;
-	int	iv_len;
-	int	auth_algorithm;		/* e.g. CRYPTO_SHA2_256_HMAC */
-	int	auth_key_len;
-	int	flags;
-	uint8_t tls_vmajor;
-	uint8_t tls_vminor;
-};
-
-/* Dummy functions here */
-static ossl_inline int ktls_enable(int fd)
-{
-    return 0;
-}
-
-static ossl_inline int ktls_start(int fd, void *dummy, size_t len, int is_tx)
-{
-    return 0;
-}
-
-static ossl_inline int ktls_send_ctrl_message(int fd, unsigned char record_type,
-                                              const void *data, size_t length)
-{
-    return -1;
-}
-
-#   endif                        /* TCP_TXTLS_ENABLE */
 #  endif                         /* __FreeBSD__ */
 
 #  if defined(OPENSSL_SYS_LINUX)
