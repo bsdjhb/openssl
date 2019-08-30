@@ -1594,7 +1594,7 @@ unless ($disabled{ktls}) {
         }
     } elsif ($target =~ m/^BSD/) {
         my $cc = $config{CROSS_COMPILE}.$config{CC};
-        system("echo '#include <sys/ktls.h>' | $cc -E - >/dev/null 2>&1");
+        system("printf '#include <sys/types.h>\n#include <sys/ktls.h>' | $cc -E - >/dev/null 2>&1");
         if ($? != 0) {
             $disabled{ktls} = "too-old-freebsd";
         }
