@@ -381,30 +381,52 @@ int tls1_change_cipher_state(SSL *s, int which)
 
 # ifdef __FreeBSD__
     memset(&crypto_info, 0, sizeof(crypto_info));
-    if (EVP_CIPHER_mode(c) == EVP_CIPH_GCM_MODE) {
-	 crypto_info.cipher_algorithm = CRYPTO_AES_NIST_GCM_16;
-	 crypto_info.iv_len = EVP_GCM_TLS_FIXED_IV_LEN;
-    } else if (EVP_CIPHER_mode(c) == EVP_CIPH_CBC_MODE) {
-         if (s->ext.use_etm)
-             goto skip_ktls;
-	 crypto_info.cipher_algorithm = CRYPTO_AES_CBC;
-	 crypto_info.iv_len = EVP_CIPHER_iv_length(c);
-	 switch (EVP_CIPHER_nid(c)) {
-	 case NID_aes_128_cbc_hmac_sha1:
-	 case NID_aes_256_cbc_hmac_sha1:
-	      crypto_info.auth_algorithm = CRYPTO_SHA1_HMAC;
-	      break;
-	 case NID_aes_128_cbc_hmac_sha256:
-	 case NID_aes_256_cbc_hmac_sha256:
-	      crypto_info.auth_algorithm = CRYPTO_SHA2_256_HMAC;
-	      break;
-	 default:
-	      goto skip_ktls;
+    switch (EVP_CIPHER_nid(c)) {
+    case NID_aes_128_gcm:
+    case NID_aes_256_gcm:
+        crypto_info.cipher_algorithm = CRYPTO_AES_NIST_GCM_16;
+        crypto_info.iv_len = EVP_GCM_TLS_FIXED_IV_LEN;
+        break;
+    case NID_aes_128_cbc:
+    case NID_aes_256_cbc:
+    case NID_aes_128_cbc_hmac_sha1:
+    case NID_aes_256_cbc_hmac_sha1:
+    case NID_aes_128_cbc_hmac_sha256:
+    case NID_aes_256_cbc_hmac_sha256:
+        if (s->ext.use_etm)
+            goto skip_ktls;
+        crypto_info.cipher_algorithm = CRYPTO_AES_CBC;
+        crypto_info.iv_len = EVP_CIPHER_iv_length(c);
+        switch (EVP_CIPHER_nid(c)) {
+        case NID_aes_128_cbc:
+        case NID_aes_256_cbc:
+            switch (mac_type) {
+            case NID_sha1:
+                crypto_info.auth_algorithm = CRYPTO_SHA1_HMAC;
+                break;
+            case NID_sha256:
+                crypto_info.auth_algorithm = CRYPTO_SHA2_256_HMAC;
+                break;
+            default:
+                goto skip_ktls;
+            }
+            break;
+        case NID_aes_128_cbc_hmac_sha1:
+        case NID_aes_256_cbc_hmac_sha1:
+            crypto_info.auth_algorithm = CRYPTO_SHA1_HMAC;
+            break;
+        case NID_aes_128_cbc_hmac_sha256:
+        case NID_aes_256_cbc_hmac_sha256:
+            crypto_info.auth_algorithm = CRYPTO_SHA2_256_HMAC;
+            break;
+        default:
+            goto skip_ktls;
         }
         crypto_info.auth_key = ms;
-	crypto_info.auth_key_len = *mac_secret_size;
-    } else
+        crypto_info.auth_key_len = *mac_secret_size;
+    default:
         goto skip_ktls;
+    }
     crypto_info.cipher_key = key;
     crypto_info.cipher_key_len = EVP_CIPHER_key_length(c);
     crypto_info.iv = iv;
