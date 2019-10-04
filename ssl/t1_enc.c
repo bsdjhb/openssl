@@ -389,6 +389,8 @@ int tls1_change_cipher_state(SSL *s, int which)
         break;
     case NID_aes_128_cbc:
     case NID_aes_256_cbc:
+        if (m == NULL)
+            goto skip_ktls;
     case NID_aes_128_cbc_hmac_sha1:
     case NID_aes_256_cbc_hmac_sha1:
     case NID_aes_128_cbc_hmac_sha256:
@@ -400,7 +402,7 @@ int tls1_change_cipher_state(SSL *s, int which)
         switch (EVP_CIPHER_nid(c)) {
         case NID_aes_128_cbc:
         case NID_aes_256_cbc:
-            switch (mac_type) {
+            switch (EVP_MD_nid(m)) {
             case NID_sha1:
                 crypto_info.auth_algorithm = CRYPTO_SHA1_HMAC;
                 break;
@@ -424,6 +426,7 @@ int tls1_change_cipher_state(SSL *s, int which)
         }
         crypto_info.auth_key = ms;
         crypto_info.auth_key_len = *mac_secret_size;
+        break;
     default:
         goto skip_ktls;
     }
