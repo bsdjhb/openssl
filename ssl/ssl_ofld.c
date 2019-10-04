@@ -197,10 +197,10 @@ static int ssl_key_context(SSL *s, struct tls_key_context *kctx, int rw, int sta
     const EVP_CIPHER *c;
     unsigned int  mac_key_size = 0, cipher_key_size, iv_size;
     unsigned char *key;
-    unsigned char s_ipad_hash[MAX_MAC_KSZ]= {0x0}; /* blk sz for hashing */
-    unsigned char s_opad_hash[MAX_MAC_KSZ]= {0x0}; /* blk sz for hashing */
-    unsigned char c_ipad_hash[MAX_MAC_KSZ]= {0x0}; /* blk sz for hashing */
-    unsigned char c_opad_hash[MAX_MAC_KSZ]= {0x0}; /* blk sz for hashing */
+    unsigned char s_ipad_hash[SHA512_BLOCK]= {0x0}; /* blk sz for hashing */
+    unsigned char s_opad_hash[SHA512_BLOCK]= {0x0}; /* blk sz for hashing */
+    unsigned char c_ipad_hash[SHA512_BLOCK]= {0x0}; /* blk sz for hashing */
+    unsigned char c_opad_hash[SHA512_BLOCK]= {0x0}; /* blk sz for hashing */
 
     unsigned char s_mac_key[MAX_MAC_KSZ] = {0x0};
     unsigned char c_mac_key[MAX_MAC_KSZ] = {0x0};
