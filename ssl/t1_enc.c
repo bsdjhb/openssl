@@ -381,49 +381,28 @@ int tls1_change_cipher_state(SSL *s, int which)
 
 # ifdef __FreeBSD__
     memset(&crypto_info, 0, sizeof(crypto_info));
-    switch (EVP_CIPHER_nid(c)) {
-    case NID_aes_128_gcm:
-    case NID_aes_256_gcm:
+    switch (s->s3.tmp.new_cipher->algorithm_enc) {
+    case SSL_AES128GCM:
+    case SSL_AES256GCM:
         crypto_info.cipher_algorithm = CRYPTO_AES_NIST_GCM_16;
         crypto_info.iv_len = EVP_GCM_TLS_FIXED_IV_LEN;
         break;
-    case NID_aes_128_cbc:
-    case NID_aes_256_cbc:
-        if (m == NULL)
-            goto skip_ktls;
-    case NID_aes_128_cbc_hmac_sha1:
-    case NID_aes_256_cbc_hmac_sha1:
-    case NID_aes_128_cbc_hmac_sha256:
-    case NID_aes_256_cbc_hmac_sha256:
+    case SSL_AES128:
+    case SSL_AES256:
         if (s->ext.use_etm)
             goto skip_ktls;
-        crypto_info.cipher_algorithm = CRYPTO_AES_CBC;
-        crypto_info.iv_len = EVP_CIPHER_iv_length(c);
-        switch (EVP_CIPHER_nid(c)) {
-        case NID_aes_128_cbc:
-        case NID_aes_256_cbc:
-            switch (EVP_MD_nid(m)) {
-            case NID_sha1:
-                crypto_info.auth_algorithm = CRYPTO_SHA1_HMAC;
-                break;
-            case NID_sha256:
-                crypto_info.auth_algorithm = CRYPTO_SHA2_256_HMAC;
-                break;
-            default:
-                goto skip_ktls;
-            }
-            break;
-        case NID_aes_128_cbc_hmac_sha1:
-        case NID_aes_256_cbc_hmac_sha1:
+        switch (s->s3.tmp.new_cipher->algorithm_mac) {
+        case SSL_SHA1:
             crypto_info.auth_algorithm = CRYPTO_SHA1_HMAC;
             break;
-        case NID_aes_128_cbc_hmac_sha256:
-        case NID_aes_256_cbc_hmac_sha256:
+        case SSL_SHA256:
             crypto_info.auth_algorithm = CRYPTO_SHA2_256_HMAC;
             break;
         default:
             goto skip_ktls;
         }
+        crypto_info.cipher_algorithm = CRYPTO_AES_CBC;
+        crypto_info.iv_len = EVP_CIPHER_iv_length(c);
         crypto_info.auth_key = ms;
         crypto_info.auth_key_len = *mac_secret_size;
         break;
