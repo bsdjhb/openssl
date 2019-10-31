@@ -156,9 +156,9 @@ int tls1_change_cipher_state(SSL *s, int which)
 # else
     struct tls12_crypto_info_aes_gcm_128 crypto_info;
     unsigned char geniv[12];
+# endif
     int count_unprocessed;
     int bit;
-# endif
     BIO *bio;
 #endif
 
@@ -480,12 +480,13 @@ int tls1_change_cipher_state(SSL *s, int which)
            TLS_CIPHER_AES_GCM_128_IV_SIZE);
     memcpy(crypto_info.salt, geniv, TLS_CIPHER_AES_GCM_128_SALT_SIZE);
     memcpy(crypto_info.key, key, EVP_CIPHER_key_length(c));
+# endif
     if (which & SSL3_CC_WRITE)
         memcpy(crypto_info.rec_seq, &s->rlayer.write_sequence,
-                TLS_CIPHER_AES_GCM_128_REC_SEQ_SIZE);
+               sizeof(crypto_info.rec_seq));
     else
         memcpy(crypto_info.rec_seq, &s->rlayer.read_sequence,
-                TLS_CIPHER_AES_GCM_128_REC_SEQ_SIZE);
+               sizeof(crypto_info.rec_seq));
 
     if (which & SSL3_CC_READ) {
         count_unprocessed = count_unprocessed_records(s);
@@ -502,7 +503,6 @@ int tls1_change_cipher_state(SSL *s, int which)
             count_unprocessed--;
         }
     }
-# endif
 
     /* ktls works with user provided buffers directly */
     if (BIO_set_ktls(bio, &crypto_info, which & SSL3_CC_WRITE)) {
