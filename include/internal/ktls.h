@@ -26,11 +26,17 @@
 #   define TLS_CIPHER_AES_GCM_128_REC_SEQ_SIZE             8
 
 /*
- * FreeBSD does not require any additional steps to enable KTLS before
- * setting keys.
+ * Some FreeBSD kernels permit a hint to request KTLS.  This can enable
+ * TLS receive with TOE.  However, the hint is not required.  If the
+ * hint is not given, less operations may be offloaded.
  */
 static ossl_inline int ktls_enable(int fd)
 {
+#ifdef SO_WANT_KTLS
+    int optval = 1;
+
+    setsockopt(fd, SOL_SOCKET, SO_WANT_KTLS, &optval, sizeof(optval));
+#endif
     return 1;
 }
 
