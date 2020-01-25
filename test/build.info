@@ -538,6 +538,7 @@ INCLUDE_MAIN___test_libtestutil_OLB = /INCLUDE=MAIN
   IF[{- !$disabled{shared} && $disabled{ktls} -}]
     PROGRAMS_NO_INST=tls13secretstest
     SOURCE[tls13secretstest]=tls13secretstest.c
+    DEFINE[tls13secretstest]=OPENSSL_NO_KTLS
     SOURCE[tls13secretstest]= ../ssl/tls13_enc.c ../ssl/packet.c
     INCLUDE[tls13secretstest]=.. ../include
     DEPEND[tls13secretstest]=../libcrypto ../libssl libtestutil.a
