@@ -32,6 +32,8 @@
 #   include <netinet/tcp.h>
 #   include <crypto/cryptodev.h>
 
+#   define OPENSSL_NO_KTLS_RX
+
 /*
  * Only used by the tests in sslapitest.c.
  */
@@ -119,6 +121,93 @@ static ossl_inline ossl_ssize_t ktls_sendfile(int s, int fd, off_t off,
     }
     return sbytes;
 }
+
+#   ifdef OSSL_SSL_LOCAL_H
+/*-
+ * Check if a given cipher is supported by the KTLS interface.
+ * The kernel might still fail the setsockopt() if no suitable
+ * provider is found, but this checks if the socket option
+ * supports the cipher suite used at all.
+ */
+static ossl_inline int ktls_check_supported_cipher(SSL *s)
+{
+
+    switch (s->version) {
+    case TLS1_VERSION:
+    case TLS1_1_VERSION:
+    case TLS1_2_VERSION:
+        break;
+    default:
+        return 0;
+    }
+
+    switch (s->s3.tmp.new_cipher->algorithm_enc) {
+    case SSL_AES128GCM:
+    case SSL_AES256GCM:
+        return 1;
+    case SSL_AES128:
+    case SSL_AES256:
+        if (s->ext.use_etm)
+            return 0;
+        switch (s->s3.tmp.new_cipher->algorithm_mac) {
+        case SSL_SHA1:
+        case SSL_SHA256:
+        case SSL_SHA384:
+            return 1;
+        default:
+            return 0;
+        }
+    default:
+        return 0;
+    }
+}
+
+/* Function to configure kernel TLS structure */
+static ossl_inline int ktls_configure_crypto(SSL *s, const EVP_CIPHER *c,
+                                             void *rl_sequence,
+                                             struct tls_crypto_info *crypto_info,
+                                             unsigned char **rec_seq,
+                                             unsigned char *iv,
+                                             unsigned char *key,
+                                             unsigned char *mac_key,
+                                             size_t mac_secret_size)
+{
+    memset(crypto_info, 0, sizeof(*crypto_info));
+    switch (s->s3.tmp.new_cipher->algorithm_enc) {
+    case SSL_AES128GCM:
+    case SSL_AES256GCM:
+        crypto_info->cipher_algorithm = CRYPTO_AES_NIST_GCM_16;
+        crypto_info->iv_len = EVP_GCM_TLS_FIXED_IV_LEN;
+        break;
+    case SSL_AES128:
+    case SSL_AES256:
+        switch (s->s3.tmp.new_cipher->algorithm_mac) {
+        case SSL_SHA1:
+            crypto_info->auth_algorithm = CRYPTO_SHA1_HMAC;
+            break;
+        case SSL_SHA256:
+            crypto_info->auth_algorithm = CRYPTO_SHA2_256_HMAC;
+            break;
+        case SSL_SHA384:
+            crypto_info->auth_algorithm = CRYPTO_SHA2_384_HMAC;
+            break;
+        }
+        crypto_info->cipher_algorithm = CRYPTO_AES_CBC;
+        crypto_info->iv_len = EVP_CIPHER_iv_length(c);
+        crypto_info->auth_key = mac_key;
+        crypto_info->auth_key_len = mac_secret_size;
+        break;
+    }
+    crypto_info->cipher_key = key;
+    crypto_info->cipher_key_len = EVP_CIPHER_key_length(c);
+    crypto_info->iv = iv;
+    crypto_info->tls_vmajor = (version >> 8) & 0x000000ff;
+    crypto_info->tls_vminor = (version & 0x000000ff);
+    memcpy(crypto_info->rec_seq, rl_sequence, sizeof(crypto_info->rec_seq));
+    if (rec_seq != NULL)
+        *rec_seq = crypto_info->rec_seq;
+};
+#   endif
 #  endif                         /* __FreeBSD__ */
 
 #  if defined(OPENSSL_SYS_LINUX)
